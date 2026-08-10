@@ -30,6 +30,10 @@
   /* A scripted jump with `behavior: 'auto'` lands in the same frame, so the guard that
      protects it only needs to outlive the scroll event it triggers. */
   const INSTANT_TRANSITION_DURATION = 120;
+  /* Length of the scripted scroll flight. Chosen to glide on the same easing family and
+     timescale as the .68–.72s CSS choreography so the viewport, bar, ornament, and
+     library all settle together. */
+  const COMPACT_SCROLL_DURATION = 700;
   const elements = {
     app: document.querySelector('#app-shell'),
     counterStage: document.querySelector('#counter-stage'),
@@ -405,18 +409,94 @@
   }
 
   /* Claim ownership of the scroll position for the length of a scripted jump.
-     window.scrollTo keeps firing scroll events across the whole eased flight, and each
-     one re-enters updateCompactState at an intermediate offset that reads as the
-     opposite gesture — so an unguarded pair of snaps would bounce against each other
-     forever. While the latch is held the compact state is frozen and only the scroll
-     bookkeeping is kept current. */
-  function beginProgrammaticScroll(behavior) {
+     The flight keeps firing scroll events, and each one re-enters updateCompactState
+     at an intermediate offset that reads as the opposite gesture — so an unguarded
+     pair of snaps would bounce against each other forever. While the latch is held
+     the compact state is frozen and only the scroll bookkeeping is kept current. */
+  function holdScrollLatch() {
     isProgrammaticScroll = true;
     window.clearTimeout(programmaticScrollTimer);
-    programmaticScrollTimer = window.setTimeout(() => {
-      isProgrammaticScroll = false;
-      lastScrollY = Math.max(0, window.scrollY);
-    }, behavior === 'auto' ? INSTANT_TRANSITION_DURATION : COMPACT_TRANSITION_DURATION);
+  }
+
+  function releaseScrollLatch() {
+    window.clearTimeout(programmaticScrollTimer);
+    isProgrammaticScroll = false;
+    lastScrollY = Math.max(0, window.scrollY);
+  }
+
+  /* Deterministic rAF-driven eased scroll. Native smooth scrolling has a
+     browser-defined curve and duration that never matches the CSS choreography and
+     cannot be observed, which forced the latch to guess with a timer. Driving the
+     flight ourselves keeps every layer gliding on the same easing for the same
+     length of time — and reports the exact frame the movement settles so the latch
+     is released precisely, never early or late. */
+  const scrollEase = (t) => 1 - Math.pow(1 - t, 5);
+  let scrollAnimation = null;
+
+  function cancelScrollAnimation() {
+    if (!scrollAnimation) return;
+    window.cancelAnimationFrame(scrollAnimation.frame);
+    scrollAnimation.cleanup();
+    scrollAnimation = null;
+  }
+
+  function animateScrollTo(targetY, onSettled) {
+    cancelScrollAnimation();
+    const startY = window.scrollY;
+    const distance = targetY - startY;
+    if (Math.abs(distance) < 1) {
+      onSettled();
+      return;
+    }
+    const root = document.documentElement;
+    const previousBehavior = root.style.scrollBehavior;
+    /* The per-frame writes must land instantly; `html` opts into CSS smooth
+       scrolling, which would otherwise turn every frame into its own eased flight. */
+    root.style.scrollBehavior = 'auto';
+    const direction = Math.sign(distance);
+    const startTime = performance.now();
+
+    /* Hand control back the moment the visitor takes over. Momentum from the
+       triggering gesture keeps emitting same-direction wheel events for a while,
+       so only a reversal — or a fresh touch — counts as an interruption. */
+    const onWheel = (event) => {
+      if ((event.deltaY || 0) * direction < 0) interrupt();
+    };
+    const onTouchStart = () => interrupt();
+    const cleanup = () => {
+      root.style.scrollBehavior = previousBehavior;
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('touchstart', onTouchStart);
+    };
+    const interrupt = () => {
+      cancelScrollAnimation();
+      onSettled();
+    };
+    window.addEventListener('wheel', onWheel, { passive: true });
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+
+    const step = (now) => {
+      const progress = Math.min(1, (now - startTime) / COMPACT_SCROLL_DURATION);
+      window.scrollTo(0, startY + distance * scrollEase(progress));
+      if (progress < 1) {
+        scrollAnimation.frame = window.requestAnimationFrame(step);
+      } else {
+        cleanup();
+        scrollAnimation = null;
+        onSettled();
+      }
+    };
+    scrollAnimation = { frame: window.requestAnimationFrame(step), cleanup };
+  }
+
+  function performScrollFlight(targetY, behavior) {
+    if (behavior === 'auto') {
+      cancelScrollAnimation();
+      window.scrollTo({ top: targetY, behavior: 'auto' });
+      programmaticScrollTimer = window.setTimeout(releaseScrollLatch, INSTANT_TRANSITION_DURATION);
+      return;
+    }
+    animateScrollTo(targetY, releaseScrollLatch);
   }
 
   /* The library's resting offset: the scroll position where the collection's top edge
@@ -429,7 +509,7 @@
   function settleOnLibrary(behavior = 'smooth') {
     finishCompactTransition();
     document.body.classList.add('is-compact', 'is-transitioning');
-    beginProgrammaticScroll(behavior);
+    holdScrollLatch();
 
     // Wait until compact layout and its measured pinned content are committed before
     // calculating the destination. Every entry deliberately lands at the collection's
@@ -437,7 +517,7 @@
     window.requestAnimationFrame(() => {
       syncActiveRecitationHeight();
       window.requestAnimationFrame(() => {
-        window.scrollTo({ top: getLibraryRestingY(), behavior });
+        performScrollFlight(getLibraryRestingY(), behavior);
         compactTransitionTimer = window.setTimeout(finishCompactTransition, COMPACT_TRANSITION_DURATION);
       });
     });
@@ -450,10 +530,10 @@
     finishCompactTransition();
     document.body.classList.remove('is-compact');
     document.body.classList.add('is-returning');
-    beginProgrammaticScroll(behavior);
+    holdScrollLatch();
     window.requestAnimationFrame(() => {
       syncActiveRecitationHeight();
-      window.scrollTo({ top: 0, behavior });
+      performScrollFlight(0, behavior);
       compactTransitionTimer = window.setTimeout(finishCompactTransition, COMPACT_TRANSITION_DURATION);
     });
   }
