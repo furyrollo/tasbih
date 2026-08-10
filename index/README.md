@@ -36,7 +36,7 @@ The hero counter is an **Islamic geometric ornament** — an 8-point star (rub e
 - Responsive mobile-first layout
 - Accessible status announcements, focus styles, semantic controls, and reduced-motion support
 - Scroll-snapped compact counter that remains available while browsing, with symmetrical
-  assisted transitions in both directions and a resumed reading position on re-entry
+  assisted and choreographed transitions in both directions
 - Hero trace of the active dua or dhikr that confirms the choice survived and reopens the
   collection with it expanded
 - Expandable, filterable dua and dhikr cards loaded from category JSON files
@@ -61,18 +61,19 @@ only mean the visitor wants the full counter back, and no reading position can b
 Someone reading further down the collection must first scroll back to that offset, so a
 single gesture never pulls them out of the text.
 
+Both directions pair the eased `window.scrollTo` flight with dedicated CSS choreography:
+the compact bar, ornament, library, and pinned recitation animate into reading mode and
+receive matching reverse treatment when the full hero returns.
+
 Both transitions drive `window.scrollTo`, which keeps emitting scroll events for the
 duration of the eased flight. Each of those events lands at an intermediate offset that
 reads as the opposite gesture, so a programmatic-scroll latch suspends compact-state
 changes until the movement settles. Without it the two assists retrigger each other and
 the page oscillates.
 
-Re-entry restores the depth the visitor had reached rather than the top of the
-collection. The depth recorded is the start of the current upward run, not the live
-scroll position, so the journey out of the library cannot overwrite it. Filtering the
-collection clears it, because the remembered offset no longer refers to the same content.
-The explicit buttons open the collection at its start, since pressing them is a separate
-intent from resuming a scroll.
+Every entry into compact mode lands at the library's resting offset. Returning to the
+hero never records or restores an earlier reading depth, so scrolling down again always
+behaves exactly like the first downward transition.
 
 ## Entry URIs
 

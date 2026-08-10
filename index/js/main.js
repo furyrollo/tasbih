@@ -30,10 +30,6 @@
   /* A scripted jump with `behavior: 'auto'` lands in the same frame, so the guard that
      protects it only needs to outlive the scroll event it triggers. */
   const INSTANT_TRANSITION_DURATION = 120;
-  /* How far past the library resting point counts as "the visitor is genuinely reading",
-     used both to record a resume depth and to ignore sub-pixel settling noise. */
-  const LIBRARY_RESUME_TOLERANCE = 32;
-
   const elements = {
     app: document.querySelector('#app-shell'),
     counterStage: document.querySelector('#counter-stage'),
@@ -96,15 +92,6 @@
      oscillates, so every programmatic scroll owns the compact state until it settles. */
   let isProgrammaticScroll = false;
   let programmaticScrollTimer;
-  /* Where the visitor had read to before returning to the hero, so re-entry can resume
-     instead of always forcing them back to the top of the collection. */
-  let libraryResumeY = null;
-  /* The offset where the current unbroken upward run began. Recording the live position
-     instead would let the journey out of the library overwrite the reading depth with
-     every frame it passes through, so the visitor would resume at the exit rather than
-     at the passage they were actually reading. */
-  let upwardRunStartY = null;
-
   function loadState() {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -304,9 +291,6 @@
       fragment.appendChild(card);
     });
     elements.cardGrid.replaceChildren(fragment);
-    // Filtering rewrites the collection's height, so a remembered depth from the old
-    // list would resume into unrelated content — or past the end of a shorter one.
-    libraryResumeY = null;
     elements.collectionStatus.textContent = filtered.length
       ? `${filtered.length} ${filtered.length === 1 ? 'remembrance' : 'remembrances'}`
       : 'No remembrances match these filters.';
@@ -409,7 +393,7 @@
 
   function finishCompactTransition() {
     window.clearTimeout(compactTransitionTimer);
-    document.body.classList.remove('is-transitioning');
+    document.body.classList.remove('is-transitioning', 'is-returning');
   }
 
   function prefersReducedMotion() {
@@ -442,38 +426,35 @@
     return getLibraryScrollTarget();
   }
 
-  function settleOnLibrary(behavior = 'smooth', { resume = false } = {}) {
-    window.clearTimeout(compactTransitionTimer);
+  function settleOnLibrary(behavior = 'smooth') {
+    finishCompactTransition();
     document.body.classList.add('is-compact', 'is-transitioning');
     beginProgrammaticScroll(behavior);
 
     // Wait until compact layout and its measured pinned content are committed before
-    // calculating the destination. This keeps the landing point stable on every size.
+    // calculating the destination. Every entry deliberately lands at the collection's
+    // start; previous reading depth is never restored.
     window.requestAnimationFrame(() => {
       syncActiveRecitationHeight();
       window.requestAnimationFrame(() => {
-        const restingY = getLibraryRestingY();
-        // Returning readers land back where they left off rather than being forced to
-        // the top of the collection on every re-entry.
-        const target = resume && libraryResumeY !== null
-          ? Math.max(restingY, libraryResumeY)
-          : restingY;
-        window.scrollTo({ top: target, behavior });
+        window.scrollTo({ top: getLibraryRestingY(), behavior });
         compactTransitionTimer = window.setTimeout(finishCompactTransition, COMPACT_TRANSITION_DURATION);
       });
     });
   }
 
-  /* The mirror of settleOnLibrary. The compact class is dropped *before* scrolling so
-     the hero is already laid out at full height and the viewport glides into it,
-     instead of the counter popping open once the journey has finished. */
+  /* The animated mirror of settleOnLibrary. Drop compact mode before the flight so the
+     full hero owns the destination, then hold is-returning for matching reverse CSS
+     choreography while the viewport glides home. */
   function returnToHero(behavior = 'smooth') {
     finishCompactTransition();
     document.body.classList.remove('is-compact');
+    document.body.classList.add('is-returning');
     beginProgrammaticScroll(behavior);
     window.requestAnimationFrame(() => {
       syncActiveRecitationHeight();
       window.scrollTo({ top: 0, behavior });
+      compactTransitionTimer = window.setTimeout(finishCompactTransition, COMPACT_TRANSITION_DURATION);
     });
   }
 
@@ -490,22 +471,11 @@
     const scrollingUp = currentScrollY < lastScrollY;
     const restingY = getLibraryRestingY();
 
-    // Track the anchor of the current upward run: the deepest point of the last pause.
-    // Any downward or stationary frame means the visitor settled there, so that becomes
-    // the new anchor; an upward frame keeps the anchor it started from.
-    if (!scrollingUp) upwardRunStartY = currentScrollY;
-
-    if (isCompact && upwardRunStartY !== null
-        && upwardRunStartY > restingY + LIBRARY_RESUME_TOLERANCE) {
-      // Genuine reading depth inside the collection, worth restoring on re-entry.
-      libraryResumeY = upwardRunStartY;
-    }
-
     if (!isCompact && currentScrollY >= getCompactEnterThreshold()) {
       // Once the visitor commits to scrolling down, always settle forward into the
       // collection. Native proximity snapping could instead choose the hero and pull
       // the page backwards, which made the old transition feel unpredictable.
-      settleOnLibrary(preferredScrollBehavior(), { resume: true });
+      settleOnLibrary(preferredScrollBehavior());
     } else if (isCompact && scrollingUp && currentScrollY <= Math.max(0, restingY - getCompactEnterThreshold())) {
       // The deliberate mirror of the downward snap, and the reason it is safe to be
       // this eager: everything above the library's resting offset is the empty hero
@@ -558,9 +528,8 @@
 
   elements.counterButton.addEventListener('click', increment);
   elements.resetButton.addEventListener('click', () => openConfirmation('session'));
-  /* Explicit buttons are deliberate acts with their own intent, so they open the
-     collection at its start; only the scroll gesture — the thing people repeat while
-     toggling between counting and reading — restores the previous depth. */
+  /* Every entry path starts at the collection's resting offset, matching the first
+     downward scroll instead of restoring an earlier reading depth. */
   elements.discoverButton.addEventListener('click', () => {
     settleOnLibrary(preferredScrollBehavior());
   });
