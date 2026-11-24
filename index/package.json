@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "validate": "node scripts/validate-content.js",
+    "build": "node scripts/build-manifest.js",
+    "test": "node scripts/validate-content.js"
+  }
+}
