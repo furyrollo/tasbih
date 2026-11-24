@@ -39,9 +39,9 @@ The hero counter is an **Islamic geometric ornament** — an 8-point star (rub e
   assisted and choreographed transitions in both directions
 - Hero trace of the active dua or dhikr that confirms the choice survived and reopens the
   collection with it expanded
-- Expandable, filterable dua and dhikr cards loaded from category JSON files
+- Expandable, filterable dua and dhikr cards loaded from category JSON files, with a smooth 3D card-flip control between Arabic and transliteration
 - Persistent active dhikr pinned flush beneath the compact counter at every scroll position
-- Global translation and transliteration visibility settings
+- Configurable default card face (`arabic` or `transliteration`) and global translation visibility settings
 - Three selectable, self-hosted Arabic typefaces: Amiri, Scheherazade New, and Noto Naskh Arabic
 
 ## Scroll transitions
@@ -103,8 +103,8 @@ Stored object fields:
 | `theme` | string | `light` or `dark` |
 | `vibration` | boolean | Whether supported devices vibrate at milestones |
 | `stopped` | boolean | Whether stop-at-milestone is currently active |
-| `showTransliteration` | boolean | Whether card transliterations are visible |
-| `showTranslation` | boolean | Whether card translations are visible |
+| `defaultCardView` | string | Default primary card face: `arabic` or `transliteration` |
+| `showTranslation` | boolean | Whether card translations are visible in the Read more drawer |
 | `arabicFont` | string | Selected self-hosted Arabic typeface |
 | `activeRecitationId` | string or null | The dua or dhikr pinned beneath the compact counter |
 

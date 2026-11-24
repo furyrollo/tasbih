@@ -762,28 +762,122 @@ body.is-compact .ornament-content.is-very-long .counter-value { font-size: 1.485
   background: var(--surface);
   box-shadow: 0 15px 42px rgba(0, 0, 0, .08);
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   overflow: clip;
   transition: border-color .2s, transform .2s, box-shadow .2s;
 }
 .recitation-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--gold) 42%, var(--line)); box-shadow: 0 20px 48px rgba(0, 0, 0, .12); }
 .recitation-card.is-active { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold), 0 18px 48px rgba(0, 0, 0, .12); }
-.recitation-card summary { min-height: 290px; padding: 24px; display: flex; flex-direction: column; cursor: pointer; list-style: none; }
-.recitation-card summary::-webkit-details-marker { display: none; }
-.card-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.type-badge, .count-badge { color: var(--gold); font-size: .65rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+
+/* 3D flip stage for the primary card surface (Arabic <-> Transliteration) */
+.card-face-stage {
+  perspective: 1200px;
+}
+.card-flipper {
+  display: grid;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  transition: transform .58s cubic-bezier(.22, 1, .36, 1);
+  will-change: transform;
+}
+.recitation-card.is-flipped .card-flipper {
+  transform: rotateY(180deg);
+}
+.card-face {
+  grid-area: 1 / 1;
+  min-height: 228px;
+  padding: 22px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.card-face-arabic {
+  transform: rotateY(0deg);
+}
+.card-face-transliteration {
+  transform: rotateY(180deg);
+  pointer-events: none;
+}
+.recitation-card.is-flipped .card-face-arabic {
+  pointer-events: none;
+}
+.recitation-card.is-flipped .card-face-transliteration {
+  pointer-events: auto;
+}
+
+.card-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.card-badges { min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
+.type-badge, .count-badge, .face-kicker { color: var(--gold); font-size: .65rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .count-badge { color: var(--muted); letter-spacing: .06em; text-transform: none; }
-.card-arabic { margin: auto 0; color: var(--text); font-size: clamp(1.72rem, 3vw, 2.1rem); line-height: 1.9; text-align: right; }
-.expand-label { margin-top: 18px; padding-top: 14px; display: flex; justify-content: space-between; color: var(--muted); border-top: 1px solid var(--line); font-size: .72rem; font-weight: 700; }
+.face-kicker {
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: .58rem;
+  letter-spacing: .11em;
+}
+
+.flip-button {
+  flex: none;
+  height: 30px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-solid) 65%, transparent);
+  cursor: pointer;
+  transition: color .2s ease, border-color .2s ease, background-color .2s ease, transform .18s ease;
+}
+.flip-button:hover {
+  color: var(--gold);
+  border-color: color-mix(in srgb, var(--gold) 55%, var(--line));
+  background: color-mix(in srgb, var(--gold-soft) 55%, transparent);
+}
+.flip-button:active { transform: scale(.93); }
+.flip-button svg { width: 13px; height: 13px; fill: currentColor; transition: transform .35s cubic-bezier(.22, 1, .36, 1); }
+.flip-button:hover svg { transform: rotate(90deg); }
+.flip-button-hint { font-size: .68rem; font-weight: 800; letter-spacing: .02em; line-height: 1; }
+.flip-button-hint.arabic-text { font-size: .88rem; line-height: 1; transform: translateY(-1px); }
+
+.card-arabic { margin: auto 0; color: var(--text); font-size: clamp(1.68rem, 2.8vw, 2.05rem); line-height: 1.88; text-align: right; }
+.card-face-transliteration .card-transliteration {
+  margin: auto 0;
+  color: var(--text);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(1.24rem, 2.1vw, 1.48rem);
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1.55;
+  letter-spacing: .005em;
+}
+
+.card-drawer summary {
+  padding: 13px 24px 16px;
+  display: block;
+  cursor: pointer;
+  list-style: none;
+  border-top: 1px solid var(--line);
+  transition: background-color .18s ease, color .18s ease;
+}
+.card-drawer summary::-webkit-details-marker { display: none; }
+.card-drawer summary:hover .expand-label { color: var(--text); }
+.expand-label { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: .72rem; font-weight: 700; transition: color .18s ease; }
 .expand-label svg { width: 18px; fill: currentColor; transition: transform .2s; }
-details[open] .expand-label svg { transform: rotate(180deg); }
-details[open] .expand-label span { font-size: 0; }
-details[open] .expand-label span::after { content: "Show less"; font-size: .72rem; }
-.card-details { padding: 0 24px 24px; }
-.card-details > div { padding: 17px 0; border-top: 1px solid var(--line); }
+.card-drawer[open] .expand-label svg { transform: rotate(180deg); }
+.card-drawer[open] .expand-label span { font-size: 0; }
+.card-drawer[open] .expand-label span::after { content: "Show less"; font-size: .72rem; }
+.card-details { padding: 0 24px 22px; }
+.card-details > div { padding: 16px 0; border-top: 1px solid var(--line); }
 .card-details span { display: block; margin-bottom: 6px; color: var(--gold); font-size: .64rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
 .card-details p { margin: 0; color: var(--muted); line-height: 1.7; }
-.card-transliteration { font-style: italic; }
-.card-footer { padding-top: 18px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.card-footer { padding-top: 16px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .card-source { color: var(--muted); font-size: .73rem; font-style: normal; }
 .set-active-button { flex: none; min-height: 40px; padding: 8px 15px; color: #fff; border: 0; border-radius: 999px; background: var(--accent); cursor: pointer; font-size: .75rem; font-weight: 800; }
 .set-active-button:hover { filter: brightness(1.08); }
@@ -863,7 +957,8 @@ body.is-compact .library-section { z-index: 10; }
 .active-details p { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.6; }
 #active-transliteration { font-style: italic; }
 
-body.hide-transliteration .transliteration-block, body.hide-translation .translation-block { display: none; }
+body.hide-translation .translation-block { display: none; }
+.card-view-fieldset { margin-top: 4px; padding-top: 18px; border-top: 1px solid var(--line); }
 .font-fieldset { margin-top: 16px; padding-top: 18px; border-top: 1px solid var(--line); }
 .font-preview { margin: 12px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--gold); background: var(--surface); text-align: center; font-size: 1.5rem; }
 
@@ -889,6 +984,7 @@ body.hide-transliteration .transliteration-block, body.hide-translation .transla
 fieldset { margin: 0 0 22px; padding: 0; border: 0; }
 legend { margin-bottom: 10px; font-weight: 700; font-size: .9rem; }
 .segmented-control { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.segmented-control-2 { grid-template-columns: repeat(2, 1fr); }
 .segmented-control label { cursor: pointer; }
 .segmented-control input { position: absolute; opacity: 0; pointer-events: none; }
 .segmented-control span { display: block; padding: 11px; border: 1px solid var(--line); border-radius: 12px; text-align: center; font-weight: 600; }
@@ -961,8 +1057,10 @@ legend { margin-bottom: 10px; font-weight: 700; font-size: .9rem; }
   body.is-compact .counter-footer { align-items: flex-end; }
   body.is-compact .reset-button { min-height: 38px; padding: 9px; }
   body.is-compact .reset-button span { display: none; }
-  .card-grid { grid-template-columns: 1fr; }
-  .recitation-card summary { min-height: 270px; }
+  .card-grid { grid-template-columns: 1fr; gap: 14px; }
+  .card-face { min-height: 196px; padding: 18px 20px 16px; }
+  .card-drawer summary { padding: 12px 20px 14px; }
+  .card-details { padding: 0 20px 18px; }
   .active-recitation { min-height: 86px; padding-inline: 54px; }
   .active-heading { gap: 6px; }
   .active-arabic { font-size: 1.2rem; }
@@ -980,7 +1078,12 @@ legend { margin-bottom: 10px; font-weight: 700; font-size: .9rem; }
   .category-carousel-button { width: 34px; height: 34px; padding: 8px; }
   .category-track { gap: 6px; padding-inline: 10px; }
   .category-chip { min-width: 104px; max-width: 150px; padding-inline: 11px; font-size: .72rem; }
-  .recitation-card summary, .card-details { padding-left: 20px; padding-right: 20px; }
+  .card-face { min-height: 182px; padding: 16px 18px 14px; gap: 12px; }
+  .card-arabic { font-size: 1.56rem; line-height: 1.82; }
+  .card-face-transliteration .card-transliteration { font-size: 1.18rem; line-height: 1.5; }
+  .flip-button { height: 28px; padding: 0 8px; }
+  .card-drawer summary { padding: 11px 18px 13px; }
+  .card-details { padding: 0 18px 16px; }
 }
 @media (max-height: 760px) and (max-width: 599px) {
   .ornament { width: min(76vw, 330px); margin-block: 14px 10px; }
@@ -988,4 +1091,8 @@ legend { margin-bottom: 10px; font-weight: 700; font-size: .9rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .card-flipper { transform: none !important; }
+  .card-face { transform: none !important; backface-visibility: visible; -webkit-backface-visibility: visible; }
+  .recitation-card:not(.is-flipped) .card-face-transliteration { visibility: hidden; opacity: 0; }
+  .recitation-card.is-flipped .card-face-arabic { visibility: hidden; opacity: 0; }
 }

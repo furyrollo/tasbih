@@ -250,12 +250,16 @@
         <div><strong>Milestone vibration</strong><small>When supported by your device</small></div>
         <label class="switch"><input id="vibration-toggle" type="checkbox"><span aria-hidden="true"></span><span class="sr-only">Toggle milestone vibration</span></label>
       </div>
+      <fieldset class="card-view-fieldset">
+        <legend>Default card view</legend>
+        <div class="segmented-control segmented-control-2" id="card-view-options">
+          <label><input type="radio" name="defaultCardView" value="arabic"><span>Arabic</span></label>
+          <label><input type="radio" name="defaultCardView" value="transliteration"><span>Transliteration</span></label>
+        </div>
+      </fieldset>
+
       <div class="setting-row">
-        <div><strong>Transliteration</strong><small>Show pronunciation guidance on cards</small></div>
-        <label class="switch"><input id="transliteration-toggle" type="checkbox"><span aria-hidden="true"></span><span class="sr-only">Toggle transliteration</span></label>
-      </div>
-      <div class="setting-row">
-        <div><strong>Translation</strong><small>Show the English meaning on cards</small></div>
+        <div><strong>Translation</strong><small>Show the English meaning in card details</small></div>
         <label class="switch"><input id="translation-toggle" type="checkbox"><span aria-hidden="true"></span><span class="sr-only">Toggle translation</span></label>
       </div>
 
@@ -295,14 +299,46 @@
 
   <template id="recitation-card-template">
     <article class="recitation-card">
-      <details>
-        <summary>
-          <span class="card-meta"><span class="type-badge"></span><span class="count-badge"></span></span>
-          <p class="card-arabic arabic-text" dir="rtl" lang="ar"></p>
+      <div class="card-face-stage">
+        <div class="card-flipper">
+          <div class="card-face card-face-arabic">
+            <div class="card-meta">
+              <div class="card-badges">
+                <span class="type-badge"></span>
+                <span class="count-badge"></span>
+              </div>
+              <button class="flip-button" type="button" aria-label="Flip card to transliteration" title="Show transliteration">
+                <span class="flip-button-hint" aria-hidden="true">Aa</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 0 0-7.75 6h2.08A6 6 0 0 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35ZM6.35 17.65A7.95 7.95 0 0 0 12 20a8 8 0 0 0 7.75-6h-2.08A6 6 0 0 1 12 18c-1.66 0-3.14-.69-4.22-1.78L11 13H4v7l2.35-2.35Z"/>
+                </svg>
+              </button>
+            </div>
+            <p class="card-arabic arabic-text" dir="rtl" lang="ar"></p>
+          </div>
+          <div class="card-face card-face-transliteration" aria-hidden="true">
+            <div class="card-meta">
+              <div class="card-badges">
+                <span class="type-badge"></span>
+                <span class="count-badge"></span>
+                <span class="face-kicker">Transliteration</span>
+              </div>
+              <button class="flip-button" type="button" aria-label="Flip card to Arabic" title="Show Arabic" tabindex="-1">
+                <span class="flip-button-hint arabic-text" lang="ar" aria-hidden="true">ع</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 0 0-7.75 6h2.08A6 6 0 0 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35ZM6.35 17.65A7.95 7.95 0 0 0 12 20a8 8 0 0 0 7.75-6h-2.08A6 6 0 0 1 12 18c-1.66 0-3.14-.69-4.22-1.78L11 13H4v7l2.35-2.35Z"/>
+                </svg>
+              </button>
+            </div>
+            <p class="card-transliteration"></p>
+          </div>
+        </div>
+      </div>
+      <details class="card-drawer">
+        <summary class="expand-summary">
           <span class="expand-label"><span>Read more</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.7 9.3 5.3 5.3 5.3-5.3 1.4 1.4-6.7 6.7-6.7-6.7 1.4-1.4Z"/></svg></span>
         </summary>
         <div class="card-details">
-          <div class="transliteration-block"><span>Transliteration</span><p class="card-transliteration"></p></div>
           <div class="translation-block"><span>Translation</span><p class="card-translation"></p></div>
           <footer class="card-footer">
             <cite class="card-source"></cite>

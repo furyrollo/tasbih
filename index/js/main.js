@@ -10,7 +10,7 @@
     theme: 'dark',
     vibration: true,
     stopped: false,
-    showTransliteration: true,
+    defaultCardView: 'arabic',
     showTranslation: true,
     arabicFont: 'amiri',
     activeRecitationId: null
@@ -71,7 +71,6 @@
     behaviorSelect: document.querySelector('#behavior-select'),
     themeToggle: document.querySelector('#theme-toggle'),
     vibrationToggle: document.querySelector('#vibration-toggle'),
-    transliterationToggle: document.querySelector('#transliteration-toggle'),
     translationToggle: document.querySelector('#translation-toggle'),
     arabicFontSelect: document.querySelector('#arabic-font-select'),
     clearLifetimeButton: document.querySelector('#clear-lifetime-button'),
@@ -87,6 +86,10 @@
   let categories = [];
   let selectedType = 'all';
   let selectedCategory = 'all';
+  /* Per-card flip overrides keyed by recitation id (`'arabic'` | `'transliteration'`).
+     Changing the global Default card view in Settings clears these so every card aligns
+     with the newly chosen default. */
+  const cardFlipOverrides = new Map();
   let confirmMode = 'session';
   let flashTimer;
   let lastLitIndex = -1;
@@ -105,16 +108,18 @@
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (!saved || typeof saved !== 'object') return { ...defaults };
+      const clean = { ...saved };
+      delete clean.showTransliteration;
       return {
         ...defaults,
-        ...saved,
+        ...clean,
         session: Math.max(0, Number(saved.session) || 0),
         lifetime: Math.max(0, Number(saved.lifetime) || 0),
         milestone: [33, 99, 100].includes(Number(saved.milestone)) ? Number(saved.milestone) : 33,
         behavior: ['keep', 'loop', 'stop'].includes(saved.behavior) ? saved.behavior : 'keep',
         theme: ['light', 'dark'].includes(saved.theme) ? saved.theme : 'dark',
         arabicFont: ARABIC_FONTS[saved.arabicFont] ? saved.arabicFont : 'amiri',
-        showTransliteration: saved.showTransliteration !== false,
+        defaultCardView: ['arabic', 'transliteration'].includes(saved.defaultCardView) ? saved.defaultCardView : 'arabic',
         showTranslation: saved.showTranslation !== false,
         activeRecitationId: typeof saved.activeRecitationId === 'string' ? saved.activeRecitationId : null
       };
@@ -166,7 +171,6 @@
   function applyPreferences() {
     document.documentElement.dataset.theme = state.theme;
     document.documentElement.style.setProperty('--arabic-font', ARABIC_FONTS[state.arabicFont]);
-    document.body.classList.toggle('hide-transliteration', !state.showTransliteration);
     document.body.classList.toggle('hide-translation', !state.showTranslation);
     elements.themeMeta.content = state.theme === 'dark' ? '#0c1512' : '#f4efe6';
   }
@@ -331,6 +335,32 @@
     window.requestAnimationFrame(centerCategoryCarousel);
   }
 
+  function getCardFaceView(id) {
+    return cardFlipOverrides.get(id) || state.defaultCardView;
+  }
+
+  function applyCardFaceState(card, view, moveFocus = false) {
+    const isFlipped = view === 'transliteration';
+    card.classList.toggle('is-flipped', isFlipped);
+    const arabicFace = card.querySelector('.card-face-arabic');
+    const translitFace = card.querySelector('.card-face-transliteration');
+    const arabicFlipBtn = arabicFace.querySelector('.flip-button');
+    const translitFlipBtn = translitFace.querySelector('.flip-button');
+    arabicFace.setAttribute('aria-hidden', String(isFlipped));
+    translitFace.setAttribute('aria-hidden', String(!isFlipped));
+    arabicFlipBtn.tabIndex = isFlipped ? -1 : 0;
+    translitFlipBtn.tabIndex = isFlipped ? 0 : -1;
+    if (moveFocus) {
+      (isFlipped ? translitFlipBtn : arabicFlipBtn).focus({ preventScroll: true });
+    }
+  }
+
+  function syncAllCardFaces() {
+    elements.cardGrid.querySelectorAll('.recitation-card').forEach((card) => {
+      applyCardFaceState(card, getCardFaceView(card.dataset.id));
+    });
+  }
+
   function renderLibrary() {
     const filtered = recitations.filter((item) => {
       const typeMatches = selectedType === 'all' || item.type === selectedType;
@@ -342,12 +372,26 @@
       const card = elements.cardTemplate.content.firstElementChild.cloneNode(true);
       card.dataset.id = item.id;
       card.classList.toggle('is-active', item.id === state.activeRecitationId);
-      card.querySelector('.type-badge').textContent = item.type;
-      card.querySelector('.count-badge').textContent = item.recommendedCount ? `${item.recommendedCount}× suggested` : '';
+      const countText = item.recommendedCount ? `${item.recommendedCount}× suggested` : '';
+      card.querySelectorAll('.type-badge').forEach((badge) => { badge.textContent = item.type; });
+      card.querySelectorAll('.count-badge').forEach((badge) => {
+        badge.textContent = countText;
+        badge.hidden = !countText;
+      });
       card.querySelector('.card-arabic').textContent = item.arabic;
       card.querySelector('.card-transliteration').textContent = item.transliteration;
       card.querySelector('.card-translation').textContent = item.translation;
       card.querySelector('.card-source').textContent = item.source;
+      applyCardFaceState(card, getCardFaceView(item.id));
+      card.querySelectorAll('.flip-button').forEach((button) => {
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const nextView = getCardFaceView(item.id) === 'transliteration' ? 'arabic' : 'transliteration';
+          if (nextView === state.defaultCardView) cardFlipOverrides.delete(item.id);
+          else cardFlipOverrides.set(item.id, nextView);
+          applyCardFaceState(card, nextView, event.detail === 0);
+        });
+      });
       const activeButton = card.querySelector('.set-active-button');
       if (item.id === state.activeRecitationId) activeButton.textContent = 'Active';
       activeButton.addEventListener('click', (event) => {
@@ -680,10 +724,11 @@
   function populateSettings() {
     const milestoneInput = elements.settingsForm.querySelector(`input[name="milestone"][value="${state.milestone}"]`);
     if (milestoneInput) milestoneInput.checked = true;
+    const cardViewInput = elements.settingsForm.querySelector(`input[name="defaultCardView"][value="${state.defaultCardView}"]`);
+    if (cardViewInput) cardViewInput.checked = true;
     elements.behaviorSelect.value = state.behavior;
     elements.themeToggle.checked = state.theme === 'dark';
     elements.vibrationToggle.checked = state.vibration;
-    elements.transliterationToggle.checked = state.showTransliteration;
     elements.translationToggle.checked = state.showTranslation;
     elements.arabicFontSelect.value = state.arabicFont;
   }
@@ -740,14 +785,20 @@
     const submitter = event.submitter;
     if (!submitter || submitter.value !== 'save') return;
     const data = new FormData(elements.settingsForm);
+    const nextCardView = data.get('defaultCardView') === 'transliteration' ? 'transliteration' : 'arabic';
+    const cardViewChanged = nextCardView !== state.defaultCardView;
     state.milestone = Number(data.get('milestone')) || 33;
     state.behavior = data.get('behavior') || 'keep';
     state.theme = elements.themeToggle.checked ? 'dark' : 'light';
     state.vibration = elements.vibrationToggle.checked;
-    state.showTransliteration = elements.transliterationToggle.checked;
+    state.defaultCardView = nextCardView;
     state.showTranslation = elements.translationToggle.checked;
     state.arabicFont = ARABIC_FONTS[elements.arabicFontSelect.value] ? elements.arabicFontSelect.value : 'amiri';
     state.stopped = state.behavior === 'stop' && state.session > 0 && state.session % state.milestone === 0;
+    if (cardViewChanged) {
+      cardFlipOverrides.clear();
+      syncAllCardFaces();
+    }
     saveState();
     render();
   });
